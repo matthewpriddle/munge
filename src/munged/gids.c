@@ -54,17 +54,26 @@
 
 /*****************************************************************************
  *  Notes
- *****************************************************************************/
-/*
- *  The gids hash contains a gid_head pointing to a singly-linked list of
- *    gid_nodes for each UID with supplementary groups.  The GIDs in each
- *    list of gid_nodes are sorted in increasing order without duplicates.
+ *****************************************************************************
+ *
+ *  The gid_hash is used to quickly lookup whether a given UID is a member of a
+ *  particular supplementary group GID.  It contains a gid_head pointing to a
+ *  singly-linked list of gid_nodes for each UID with supplementary groups.
+ *  The list of gid_nodes is sorted in increasing order of GIDs without
+ *  duplicates.  This hash is constructed outside of the gids mutex, and
+ *  switched in during an update to replace the old gid_hash while the mutex
+ *  is held.
+ *
+ *  The uid_hash is used to cache positive & negative user lookups during
+ *  the construction of a gid_hash, after which it is destroyed.  It contains
+ *  uid_nodes mapping a unique null-terminated user string to a UID.  It is not
+ *  persistent across gid_hash updates.
  *
  *  The use of non-reentrant passwd/group functions (i.e., getpwnam & getgrent)
- *    here should not cause problems since they are only called in/from
- *    _gids_map_create(), and only one instance of that routine can be running
- *    at a time within munged.  However, crashes have been traced to the use of
- *    getgrent() here (Issue #2) so the reentrant functions are now used.
+ *  here should not cause problems since they are only called in/from
+ *  _gids_map_create(), and only one instance of that routine can be running at
+ *  a time.  However, crashes have been traced to the use of getgrent() here
+ *  (Issue #2) so the reentrant functions are now used.
  */
 
 
@@ -95,7 +104,7 @@ struct gids {
 
 struct gid_head {
     struct gid_node    *next;
-    uid_t               uid;
+    uid_t               uid;            /* gid_hash key                      */
 };
 
 struct gid_node {
@@ -104,7 +113,7 @@ struct gid_node {
 };
 
 struct uid_node {
-    char               *user;
+    char               *user;           /* uid_hash key                      */
     uid_t               uid;
 };
 
@@ -281,7 +290,7 @@ gids_is_member (gids_t gids, uid_t uid, gid_t gid)
 static void
 _gids_map_update (gids_t gids)
 {
-/*  Updates the GIDs mapping [gids] if needed.
+/*  Update the GIDs mapping [gids] and schedule the next update.
  */
     int             do_group_stat;
     time_t          t_last_update;
@@ -318,7 +327,7 @@ _gids_map_update (gids_t gids)
             do_update = 0;
         }
     }
-    /*  Update the GIDs mapping.
+    /*  Update the GIDs mapping without holding the mutex.
      */
     if (do_update) {
         hash = _gids_map_create ();
@@ -345,8 +354,7 @@ _gids_map_update (gids_t gids)
     if (do_group_stat < -1) {
         gids->do_group_stat = -1;
     }
-    /*  Enable subsequent updating of the GIDs mapping only if the update
-     *    interval is positive.
+    /*  Enable subsequent updating of the GIDs mapping.
      */
     gids->timer = 0;
     if (gids->interval_secs > 0) {
@@ -360,7 +368,7 @@ _gids_map_update (gids_t gids)
     if ((errno = pthread_mutex_unlock (&gids->mutex)) != 0) {
         log_errno (EMUNGE_SNAFU, LOG_ERR, "Failed to unlock gids mutex");
     }
-    /*  Clean up.
+    /*  Clean up the old hash.
      */
     if (hash) {
         hash_destroy (hash);
@@ -372,7 +380,8 @@ _gids_map_update (gids_t gids)
 static hash_t
 _gids_map_create (void)
 {
-/*  Returns a new hash containing the new GIDs mapping, or NULL on error.
+/*  Create a new GIDs hash to map UIDs to their supplementary groups.
+ *  Return a pointer to the hash on success, or NULL on error.
  */
     static size_t   grbuflen = 0;
     static size_t   pwbuflen = 0;
@@ -518,8 +527,9 @@ static int
 _gids_user_to_uid (hash_t uid_hash, const char *user, uid_t *uid_resultp,
         xpwbuf_p pwbufp)
 {
-/*  Returns 0 on success, setting [*uid_resultp] (if non-NULL) to the UID
- *    associated with [user]; o/w, returns -1.
+/*  Lookup the UID of [user].
+ *    [pwbufp] is a pre-allocated buffer for xgetpwnam() (see above comments).
+ *  Return 0 and set [*uid_resultp] (if non-NULL) on success, or -1 on error.
  */
     uid_node_p     u;
     uid_t          uid;
@@ -558,8 +568,8 @@ _gids_user_to_uid (hash_t uid_hash, const char *user, uid_t *uid_resultp,
 static int
 _gids_gid_add (hash_t hash, uid_t uid, gid_t gid)
 {
-/*  Adds supplementary group [gid] for user [uid] to the GIDs mapping [gids].
- *  Returns 1 if the entry was added, 0 if the entry already exists,
+/*  Add supplementary group [gid] for user [uid] to the GIDs map [hash].
+ *  Return 1 if the entry was added, 0 if the entry already exists,
  *    or -1 on error.
  */
     gid_head_p  g;
@@ -599,7 +609,7 @@ _gids_gid_add (hash_t hash, uid_t uid, gid_t gid)
 static gid_head_p
 _gids_gid_head_create (uid_t uid)
 {
-/*  Returns an allocated GIDs head for [uid], or NULL on error.
+/*  Allocate and return a gid_head for [uid], or NULL on error.
  */
     gid_head_p g;
 
@@ -615,7 +625,7 @@ _gids_gid_head_create (uid_t uid)
 static void
 _gids_gid_head_destroy (gid_head_p g)
 {
-/*  De-allocates the GIDs head [g] and node chain.
+/*  De-allocate the gid_head [g] and gid_node chain.
  */
     gid_node_p node, node_tmp;
 
@@ -636,7 +646,7 @@ _gids_gid_head_destroy (gid_head_p g)
 static int
 _gids_gid_head_cmp (const uid_t *uid1p, const uid_t *uid2p)
 {
-/*  Used by the hash routines to compare hash keys [uid1p] and [uid2p].
+/*  Used by the hash routines to compare gid hash keys [uid1p] and [uid2p].
  */
     if (*uid1p < *uid2p) {
         return (-1);
@@ -651,7 +661,7 @@ _gids_gid_head_cmp (const uid_t *uid1p, const uid_t *uid2p)
 static unsigned int
 _gids_gid_head_key (uid_t *uidp)
 {
-/*  Used by the hash routines to convert [uidp] into a hash key.
+/*  Used by the hash routines to convert [uidp] into a gid hash key.
  */
     return (*uidp);
 }
@@ -660,7 +670,8 @@ _gids_gid_head_key (uid_t *uidp)
 static gid_node_p
 _gids_gid_node_create (gid_t gid)
 {
-/*  Returns an allocated GIDs node for [gid], or NULL on error.
+/*  Allocate and return a gid_node for [gid], or NULL on error.
+ *  De-allocation is handled by _gids_gid_head_destroy().
  */
     gid_node_p node;
 
@@ -676,7 +687,7 @@ _gids_gid_node_create (gid_t gid)
 static uid_node_p
 _gids_uid_node_create (const char *user, uid_t uid)
 {
-/*  Returns an allocated UID node mapping [user] to [uid], or NULL on error.
+/*  Allocate and return a uid_node mapping [user] to [uid], or NULL on error.
  */
     uid_node_p u;
 
@@ -698,7 +709,7 @@ _gids_uid_node_create (const char *user, uid_t uid)
 static void
 _gids_uid_node_destroy (uid_node_p u)
 {
-/*  De-allocates the UID node [u].
+/*  De-allocate the uid_node [u].
  */
     if (!u) {
         return;
