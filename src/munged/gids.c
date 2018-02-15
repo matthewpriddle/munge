@@ -120,7 +120,7 @@ typedef struct gids_uid  * gids_uid_t;
 static void         _gids_update (gids_t gids);
 static hash_t       _gids_hash_create (void);
 static int          _gids_user_to_uid (hash_t uid_hash,
-                        const char *user, uid_t *uidp, xpwbuf_p pwbufp);
+                        const char *user, uid_t *uid_resultp, xpwbuf_p pwbufp);
 static int          _gids_hash_add (hash_t hash, uid_t uid, gid_t gid);
 static gids_gid_t   _gids_head_alloc (uid_t uid);
 static void         _gids_head_del (gids_gid_t g);
@@ -510,11 +510,11 @@ err:
 
 
 static int
-_gids_user_to_uid (hash_t uid_hash, const char *user, uid_t *uidp,
+_gids_user_to_uid (hash_t uid_hash, const char *user, uid_t *uid_resultp,
         xpwbuf_p pwbufp)
 {
-/*  Returns 0 on success, setting [*uidp] (if non-NULL) to the UID associated
- *    with [user]; o/w, returns -1.
+/*  Returns 0 on success, setting [*uid_resultp] (if non-NULL) to the UID
+ *    associated with [user]; o/w, returns -1.
  */
     gids_uid_t     u;
     uid_t          uid;
@@ -543,8 +543,8 @@ _gids_user_to_uid (hash_t uid_hash, const char *user, uid_t *uidp,
         return (-1);
     }
 
-    if (uidp != NULL) {
-        *uidp = uid;
+    if (uid_resultp != NULL) {
+        *uid_resultp = uid;
     }
     return (0);
 }
