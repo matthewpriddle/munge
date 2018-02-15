@@ -72,8 +72,11 @@
  *  Constants
  *****************************************************************************/
 
+#define GID_HASH_SIZE           2053
+#define UID_HASH_SIZE           4099
+
 #ifndef _GIDS_DEBUG
-#define _GIDS_DEBUG     0
+#define _GIDS_DEBUG             0
 #endif /* !_GIDS_DEBUG */
 
 
@@ -387,14 +390,14 @@ _gids_hash_create (void)
     int             n_users;
     double          n_seconds;
 
-    gid_hash = hash_create (GIDS_HASH_SIZE, (hash_key_f) _gids_node_key,
+    gid_hash = hash_create (GID_HASH_SIZE, (hash_key_f) _gids_node_key,
             (hash_cmp_f) _gids_node_cmp, (hash_del_f) _gids_head_del);
 
     if (!gid_hash) {
         log_msg (LOG_ERR, "Failed to allocate gids hash");
         goto err;
     }
-    uid_hash = hash_create (UIDS_HASH_SIZE, (hash_key_f) hash_key_string,
+    uid_hash = hash_create (UID_HASH_SIZE, (hash_key_f) hash_key_string,
             (hash_cmp_f) _gids_uid_cmp, (hash_del_f) _gids_uid_del);
 
     if (!uid_hash) {
