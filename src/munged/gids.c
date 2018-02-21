@@ -124,10 +124,10 @@ static int          _gids_user_to_uid (hash_t uid_hash,
 static int          _gids_gid_add (hash_t hash, uid_t uid, gid_t gid);
 static gid_head_p   _gids_gid_head_create (uid_t uid);
 static void         _gids_gid_head_destroy (gid_head_p g);
-static gid_node_p   _gids_gid_node_create (gid_t gid);
 static int          _gids_gid_head_cmp (
                         const uid_t *uid1p, const uid_t *uid2p);
 static unsigned int _gids_gid_head_key (uid_t *uidp);
+static gid_node_p   _gids_gid_node_create (gid_t gid);
 static uid_node_p   _gids_uid_node_create (const char *user, uid_t uid);
 static void         _gids_uid_node_destroy (uid_node_p u);
 
@@ -633,22 +633,6 @@ _gids_gid_head_destroy (gid_head_p g)
 }
 
 
-static gid_node_p
-_gids_gid_node_create (gid_t gid)
-{
-/*  Returns an allocated GIDs node for [gid], or NULL on error.
- */
-    gid_node_p node;
-
-    if (!(node = malloc (sizeof (*node)))) {
-        return (NULL);
-    }
-    node->next = NULL;
-    node->gid = gid;
-    return (node);
-}
-
-
 static int
 _gids_gid_head_cmp (const uid_t *uid1p, const uid_t *uid2p)
 {
@@ -670,6 +654,22 @@ _gids_gid_head_key (uid_t *uidp)
 /*  Used by the hash routines to convert [uidp] into a hash key.
  */
     return (*uidp);
+}
+
+
+static gid_node_p
+_gids_gid_node_create (gid_t gid)
+{
+/*  Returns an allocated GIDs node for [gid], or NULL on error.
+ */
+    gid_node_p node;
+
+    if (!(node = malloc (sizeof (*node)))) {
+        return (NULL);
+    }
+    node->next = NULL;
+    node->gid = gid;
+    return (node);
 }
 
 
