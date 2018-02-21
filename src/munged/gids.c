@@ -163,7 +163,7 @@ gids_create (int interval_secs, int do_group_stat)
     }
     if (!(gids = malloc (sizeof (*gids)))) {
         log_errno (EMUNGE_NO_MEMORY, LOG_ERR,
-            "Failed to allocate gids struct");
+                "Failed to allocate gids struct");
     }
     if ((errno = pthread_mutex_init (&gids->mutex, NULL)) != 0) {
         log_errno (EMUNGE_SNAFU, LOG_ERR, "Failed to init gids mutex");
@@ -180,11 +180,11 @@ gids_create (int interval_secs, int do_group_stat)
     }
     else {
         log_msg (LOG_INFO,
-            "Updating supplementary group mapping every %d second%s",
-            interval_secs, (interval_secs == 1) ? "" : "s");
+                "Updating supplementary group mapping every %d second%s",
+                interval_secs, (interval_secs == 1) ? "" : "s");
     }
     log_msg (LOG_INFO, "%s supplementary group mtime check of \"%s\"",
-        (do_group_stat ? "Enabled" : "Disabled"), GIDS_GROUP_FILE);
+            (do_group_stat ? "Enabled" : "Disabled"), GIDS_GROUP_FILE);
 
     return (gids);
 }
@@ -215,7 +215,7 @@ gids_destroy (gids_t gids)
 
     if ((errno = pthread_mutex_destroy (&gids->mutex)) != 0) {
         log_msg (LOG_ERR, "Failed to destroy gids mutex: %s",
-            strerror (errno));
+                strerror (errno));
     }
     free (gids);
     return;
@@ -292,11 +292,11 @@ _gids_map_update (gids_t gids)
 {
 /*  Update the GIDs mapping [gids] and schedule the next update.
  */
-    int             do_group_stat;
-    time_t          t_last_update;
-    time_t          t_now;
-    int             do_update = 1;
-    hash_t          gid_hash = NULL;
+    int    do_group_stat;
+    time_t t_last_update;
+    time_t t_now;
+    int    do_update = 1;
+    hash_t gid_hash = NULL;
 
     assert (gids != NULL);
 
@@ -321,7 +321,7 @@ _gids_map_update (gids_t gids)
         if (stat (GIDS_GROUP_FILE, &st) < 0) {
             do_group_stat = -2;
             log_msg (LOG_ERR, "Failed to stat \"%s\": %s",
-                GIDS_GROUP_FILE, strerror (errno));
+                    GIDS_GROUP_FILE, strerror (errno));
         }
         else if (st.st_mtime <= t_last_update) {
             do_update = 0;
@@ -362,7 +362,7 @@ _gids_map_update (gids_t gids)
                 gids->interval_secs * 1000);
         if (gids->timer < 0) {
             log_errno (EMUNGE_SNAFU, LOG_ERR,
-                "Failed to reset gids update timer");
+                    "Failed to reset gids update timer");
         }
     }
     if ((errno = pthread_mutex_unlock (&gids->mutex)) != 0) {
@@ -492,13 +492,13 @@ restart:
     n_users = hash_count (gid_hash);
     if (n_users < 0) {
         log_err (EMUNGE_SNAFU, LOG_ERR,
-            "Failed _gids_map_create(): invalid gid_hash ptr");
+                "Failed _gids_map_create(): invalid gid_hash ptr");
     }
     n_seconds = (t_stop.tv_sec - t_start.tv_sec)
         + ((t_stop.tv_usec - t_start.tv_usec) / 1e6);
     log_msg (LOG_INFO,
-        "Found %d user%s with supplementary groups in %0.3f seconds",
-        n_users, ((n_users == 1) ? "" : "s"), n_seconds);
+            "Found %d user%s with supplementary groups in %0.3f seconds",
+            n_users, ((n_users == 1) ? "" : "s"), n_seconds);
 
     hash_destroy (uid_hash);
     return (gid_hash);
@@ -531,9 +531,9 @@ _gids_user_to_uid (hash_t uid_hash, const char *user, uid_t *uid_resultp,
  *    [pwbufp] is a pre-allocated buffer for xgetpwnam() (see above comments).
  *  Return 0 and set [*uid_resultp] (if non-NULL) on success, or -1 on error.
  */
-    uid_node_p     u;
-    uid_t          uid;
-    struct passwd  pw;
+    uid_node_p    u;
+    uid_t         uid;
+    struct passwd pw;
 
     if ((u = hash_find (uid_hash, user))) {
         uid = u->uid;
@@ -542,19 +542,19 @@ _gids_user_to_uid (hash_t uid_hash, const char *user, uid_t *uid_resultp,
         uid = pw.pw_uid;
         if (!(u = _gids_uid_node_create (user, uid))) {
             log_msg (LOG_WARNING,
-                "Failed to allocate uid node for %s/%u",
-                user, (unsigned int) uid);
+                    "Failed to allocate uid node for %s/%u",
+                    user, (unsigned int) uid);
         }
         else if (!hash_insert (uid_hash, u->user, u)) {
             log_msg (LOG_WARNING,
-                "Failed to insert uid node for %s/%u into hash",
-                user, (unsigned int) uid);
+                    "Failed to insert uid node for %s/%u into hash",
+                    user, (unsigned int) uid);
             _gids_uid_node_destroy (u);
         }
     }
     else {
         log_msg (LOG_INFO,
-            "Failed to query password file entry for \"%s\"", user);
+                "Failed to query password file entry for \"%s\"", user);
         return (-1);
     }
 
@@ -736,7 +736,7 @@ _gids_gid_hash_dump (hash_t gid_hash)
     n = hash_count (gid_hash);
     if (n < 0) {
         log_err (EMUNGE_SNAFU, LOG_ERR,
-            "Failed _gids_gid_hash_dump(): invalid gid_hash ptr");
+                "Failed _gids_gid_hash_dump(): invalid gid_hash ptr");
     }
     printf ("* GIDs Dump (%d UID%s):\n", n, ((n == 1) ? "" : "s"));
     hash_for_each (gid_hash, (hash_arg_f) _gids_gid_node_dump, NULL);
@@ -768,7 +768,7 @@ _gids_uid_hash_dump (hash_t uid_hash)
     n = hash_count (uid_hash);
     if (n < 0) {
         log_err (EMUNGE_SNAFU, LOG_ERR,
-            "Failed _gids_uid_hash_dump(): invalid uid_hash ptr");
+                "Failed _gids_uid_hash_dump(): invalid uid_hash ptr");
     }
     printf ("* UID Dump (%d user%s):\n", n, ((n == 1) ? "" : "s"));
     hash_for_each (uid_hash, (hash_arg_f) _gids_uid_node_dump, NULL);
