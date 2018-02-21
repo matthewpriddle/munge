@@ -130,7 +130,7 @@ static void         _gids_map_update (gids_t gids);
 static hash_t       _gids_map_create (void);
 static int          _gids_user_to_uid (hash_t uid_hash,
                         const char *user, uid_t *uid_resultp, xpwbuf_p pwbufp);
-static int          _gids_gid_add (hash_t hash, uid_t uid, gid_t gid);
+static int          _gids_gid_add (hash_t gid_hash, uid_t uid, gid_t gid);
 static gid_head_p   _gids_gid_head_create (uid_t uid);
 static void         _gids_gid_head_destroy (gid_head_p g);
 static int          _gids_gid_head_cmp (
@@ -566,9 +566,9 @@ _gids_user_to_uid (hash_t uid_hash, const char *user, uid_t *uid_resultp,
 
 
 static int
-_gids_gid_add (hash_t hash, uid_t uid, gid_t gid)
+_gids_gid_add (hash_t gid_hash, uid_t uid, gid_t gid)
 {
-/*  Add supplementary group [gid] for user [uid] to the GIDs map [hash].
+/*  Add supplementary group [gid] for user [uid] to the GIDs map [gid_hash].
  *  Return 1 if the entry was added, 0 if the entry already exists,
  *    or -1 on error.
  */
@@ -576,12 +576,12 @@ _gids_gid_add (hash_t hash, uid_t uid, gid_t gid)
     gid_node_p  node;
     gid_node_p *nodep;
 
-    if (!(g = hash_find (hash, &uid))) {
+    if (!(g = hash_find (gid_hash, &uid))) {
         if (!(g = _gids_gid_head_create (uid))) {
             log_msg (LOG_ERR, "Failed to allocate gid head");
             return (-1);
         }
-        if (!hash_insert (hash, &g->uid, g)) {
+        if (!hash_insert (gid_hash, &g->uid, g)) {
             log_msg (LOG_ERR, "Failed to insert gid head into hash");
             _gids_gid_head_destroy (g);
             return (-1);
