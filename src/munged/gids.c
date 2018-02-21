@@ -86,7 +86,7 @@
 
 struct gids {
     pthread_mutex_t     mutex;          /* mutex for accessing struct        */
-    hash_t              hash;           /* hash of GIDs mappings             */
+    hash_t              gid_hash;       /* hash of GIDs mappings             */
     long                timer;          /* timer ID for next GIDs map update */
     int                 interval_secs;  /* seconds between GIDs map updates  */
     int                 do_group_stat;  /* true if updates stat group file   */
@@ -158,7 +158,7 @@ gids_create (int interval_secs, int do_group_stat)
     if ((errno = pthread_mutex_init (&gids->mutex, NULL)) != 0) {
         log_errno (EMUNGE_SNAFU, LOG_ERR, "Failed to init gids mutex");
     }
-    gids->hash = NULL;
+    gids->gid_hash = NULL;
     gids->timer = 0;
     gids->interval_secs = interval_secs;
     gids->do_group_stat = do_group_stat;
@@ -195,8 +195,8 @@ gids_destroy (gids_t gids)
         timer_cancel (gids->timer);
         gids->timer = 0;
     }
-    h = gids->hash;
-    gids->hash = NULL;
+    h = gids->gid_hash;
+    gids->gid_hash = NULL;
 
     if ((errno = pthread_mutex_unlock (&gids->mutex)) != 0) {
         log_errno (EMUNGE_SNAFU, LOG_ERR, "Failed to unlock gids mutex");
@@ -257,7 +257,7 @@ gids_is_member (gids_t gids, uid_t uid, gid_t gid)
     if ((errno = pthread_mutex_lock (&gids->mutex)) != 0) {
         log_errno (EMUNGE_SNAFU, LOG_ERR, "Failed to lock gids mutex");
     }
-    if ((gids->hash) && (g = hash_find (gids->hash, &uid))) {
+    if ((gids->gid_hash) && (g = hash_find (gids->gid_hash, &uid))) {
         assert (g->uid == uid);
         for (node = g->next; node && node->gid <= gid; node = node->next) {
             if (node->gid == gid) {
@@ -329,8 +329,8 @@ _gids_update (gids_t gids)
      */
     if (hash) {
 
-        hash_t hash_bak = gids->hash;
-        gids->hash = hash;
+        hash_t hash_bak = gids->gid_hash;
+        gids->gid_hash = hash;
         hash = hash_bak;
 
         gids->t_last_update = t_now;
