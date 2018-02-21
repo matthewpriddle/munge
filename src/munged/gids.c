@@ -42,6 +42,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <munge.h>
+#include "common.h"
 #include "conf.h"
 #include "gids.h"
 #include "hash.h"
@@ -131,6 +132,8 @@ static hash_t       _gids_map_create (void);
 static int          _gids_user_to_uid (hash_t uid_hash,
                         const char *user, uid_t *uid_resultp, xpwbuf_p pwbufp);
 static int          _gids_gid_add (hash_t gid_hash, uid_t uid, gid_t gid);
+static int          _gids_uid_add (hash_t uid_hash,
+                        const char *user, uid_t uid);
 static gid_head_p   _gids_gid_head_create (uid_t uid);
 static void         _gids_gid_head_destroy (gid_head_p g);
 static int          _gids_gid_head_cmp (
@@ -540,24 +543,22 @@ _gids_user_to_uid (hash_t uid_hash, const char *user, uid_t *uid_resultp,
     }
     else if (xgetpwnam (user, &pw, pwbufp) == 0) {
         uid = pw.pw_uid;
-        if (!(u = _gids_uid_node_create (user, uid))) {
-            log_msg (LOG_WARNING,
-                    "Failed to allocate uid node for %s/%u",
-                    user, (unsigned int) uid);
-        }
-        else if (!hash_insert (uid_hash, u->user, u)) {
-            log_msg (LOG_WARNING,
-                    "Failed to insert uid node for %s/%u into hash",
-                    user, (unsigned int) uid);
-            _gids_uid_node_destroy (u);
-        }
+        (void) _gids_uid_add (uid_hash, user, uid);
+    }
+    else if (errno == ENOENT) {
+        uid = UID_SENTINEL;
+        (void) _gids_uid_add (uid_hash, user, uid);
+        log_msg (LOG_INFO,
+                "Failed to query password file for \"%s\": User not found",
+                user);
     }
     else {
-        log_msg (LOG_INFO,
-                "Failed to query password file entry for \"%s\"", user);
+        log_msg (LOG_NOTICE, "Failed to query password file for \"%s\": %s",
+                user, strerror (errno));
+    }
+    if (uid == UID_SENTINEL) {
         return (-1);
     }
-
     if (uid_resultp != NULL) {
         *uid_resultp = uid;
     }
@@ -603,6 +604,31 @@ _gids_gid_add (hash_t gid_hash, uid_t uid, gid_t gid)
     node->next = *nodep;
     *nodep = node;
     return (1);
+}
+
+
+static int
+_gids_uid_add (hash_t uid_hash, const char *user, uid_t uid)
+{
+/*  Add mapping from [user] to [uid] to the hash [uid_hash].
+ *    This assumes [user] does not already exist in the hash.
+ *  Return 1 if the mapping was added, or -1 on error.
+ */
+    uid_node_p u;
+
+    if (!(u = _gids_uid_node_create (user, uid))) {
+        log_msg (LOG_WARNING, "Failed to allocate uid node for %s/%u",
+                user, (unsigned int) uid);
+    }
+    else if (!hash_insert (uid_hash, u->user, u)) {
+        log_msg (LOG_WARNING, "Failed to insert uid node for %s/%u into hash",
+                user, (unsigned int) uid);
+        _gids_uid_node_destroy (u);
+    }
+    else {
+        return (1);
+    }
+    return (-1);
 }
 
 
@@ -751,7 +777,7 @@ _gids_gid_node_dump (gid_head_p g, uid_t *uidp, void *null)
 
     assert (g->uid == *uidp);
 
-    printf (" %5u:", (unsigned int) g->uid);
+    printf ("  %-10u:", (unsigned int) g->uid);
     for (node = g->next; node; node = node->next) {
         printf (" %u", (unsigned int) node->gid);
     }
@@ -781,7 +807,7 @@ _gids_uid_node_dump (uid_node_p u, char *user, void *null)
 {
     assert (u->user == user);
 
-    printf (" %5u: %s\n", (unsigned int) u->uid, u->user);
+    printf ("  %-10u: %s\n", (unsigned int) u->uid, u->user);
     return;
 }
 
