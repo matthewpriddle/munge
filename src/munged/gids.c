@@ -296,7 +296,7 @@ _gids_map_update (gids_t gids)
     time_t          t_last_update;
     time_t          t_now;
     int             do_update = 1;
-    hash_t          hash = NULL;
+    hash_t          gid_hash = NULL;
 
     assert (gids != NULL);
 
@@ -330,18 +330,18 @@ _gids_map_update (gids_t gids)
     /*  Update the GIDs mapping without holding the mutex.
      */
     if (do_update) {
-        hash = _gids_map_create ();
+        gid_hash = _gids_map_create ();
     }
     if ((errno = pthread_mutex_lock (&gids->mutex)) != 0) {
         log_errno (EMUNGE_SNAFU, LOG_ERR, "Failed to lock gids mutex");
     }
     /*  Replace the old GIDs mapping if the update was successful.
      */
-    if (hash) {
+    if (gid_hash != NULL) {
 
-        hash_t hash_bak = gids->gid_hash;
-        gids->gid_hash = hash;
-        hash = hash_bak;
+        hash_t gid_hash_bak = gids->gid_hash;
+        gids->gid_hash = gid_hash;
+        gid_hash = gid_hash_bak;
 
         gids->t_last_update = t_now;
     }
@@ -370,8 +370,8 @@ _gids_map_update (gids_t gids)
     }
     /*  Clean up the old hash.
      */
-    if (hash) {
-        hash_destroy (hash);
+    if (gid_hash != NULL) {
+        hash_destroy (gid_hash);
     }
     return;
 }
