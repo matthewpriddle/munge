@@ -397,7 +397,7 @@ _gids_map_create (void)
             (hash_del_f) _gids_gid_head_destroy);
 
     if (!gid_hash) {
-        log_msg (LOG_ERR, "Failed to allocate gids hash");
+        log_msg (LOG_ERR, "Failed to allocate gid hash");
         goto err;
     }
     uid_hash = hash_create (UID_HASH_SIZE,
@@ -406,7 +406,7 @@ _gids_map_create (void)
             (hash_del_f) _gids_uid_node_destroy);
 
     if (!uid_hash) {
-        log_msg (LOG_ERR, "Failed to allocate uids hash");
+        log_msg (LOG_ERR, "Failed to allocate uid hash");
         goto err;
     }
     if (gettimeofday (&t_start, NULL) < 0) {
